@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<title>Laser Mirror</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- toolbar -->
+  <div id="toolbar">
+    <span style="padding:0 14px;font-size:11px;letter-spacing:0.1em;color:#555;">LASER MIRROR</span>
+    <div style="margin-left:auto;display:flex;gap:8px;padding-right:12px;">
+      <button class="btn" id="exportBtn" style="display:none;">&#8681; json</button>
+      <button class="btn capture" id="captureBtn" style="display:none;">&#9679; capture</button>
+    </div>
+  </div>
+
+  <!-- right-side vertical action buttons -->
+  <div id="rightToolbar">
+    <button class="btn add-mirror" id="addMirrorBtn">&#9675; + mirror</button>
+    <button class="btn add-beam" id="addBeamBtn">&#9135; + beam</button>
+    <button class="btn random-tone" id="randomBtn">&#9861; random</button>
+    <button class="btn clear-tone" id="clearBtn">clear</button>
+    <div class="ctrl vis-ctrl">
+      <span class="lbl">VIS</span>
+      <input type="range" class="sl-w" id="sl-brightness" min="0" max="1" step="0.01" value="1">
+      <span class="val" id="v-brightness">100%</span>
+    </div>
+  </div>
+
+  <!-- ══ SINGLE CONTROLS BAR — select mode is the only mode ══════════════ -->
+  <div id="controls" class="mode-default">
+
+    <!-- nothing selected -->
+    <div id="ctx-select-idle" class="ctrl">
+      <span style="font-size:10px;color:#333;letter-spacing:0.1em;">click an object to edit · drag to move</span>
+    </div>
+
+    <!-- spinner selected -->
+    <div id="ctx-sel-spinner" style="display:none;" class="ctrl">
+      <span id="sel-label">⊙ MIRROR</span>
+      <span class="lbl sel">SPEED</span>
+      <input type="range" class="sl-p" id="sl-ss-speed" min="-10" max="10" step="0.1" value="2">
+      <span class="val vp" id="v-ss-speed">7.2°/s</span>
+      <div class="sep"></div>
+      <span class="lbl sel">DIR</span>
+      <input type="range" class="sl-p" id="sl-ss-dir" min="0" max="359" step="1" value="0">
+      <span class="val vp" id="v-ss-dir">0°</span>
+      <div class="sep"></div>
+      <span class="lbl sel">LENGTH</span>
+      <input type="range" class="sl-p" id="sl-ss-len" min="5" max="240" step="1" value="150">
+      <span class="val vp" id="v-ss-len">150px</span>
+      <div class="sep"></div>
+      <span class="lbl sel">LEAK</span>
+      <input type="range" class="sl-o sl-sm" id="sl-ss-leak" min="0" max="1" step="0.01" value="0">
+      <span class="val vo" id="v-ss-leak">0%</span>
+      <div class="sep"></div>
+      <span class="adv-lbl">LEAK RGB</span>
+      <div class="rgb-row"><span class="rgb-lbl rl">R</span><input type="range" class="sr sl-sm" id="sl-ss-lr" min="0" max="1" step="0.01" value="0"><span class="rv rl" id="v-ss-lr">0%</span></div>
+      <div class="rgb-row"><span class="rgb-lbl gl">G</span><input type="range" class="sg sl-sm" id="sl-ss-lg" min="0" max="1" step="0.01" value="0"><span class="rv gl" id="v-ss-lg">0%</span></div>
+      <div class="rgb-row"><span class="rgb-lbl bl">B</span><input type="range" class="sb sl-sm" id="sl-ss-lb" min="0" max="1" step="0.01" value="0"><span class="rv bl" id="v-ss-lb">0%</span></div>
+    </div>
+
+    <!-- beam selected -->
+    <div id="ctx-sel-beam" style="display:none;" class="ctrl">
+      <span id="sel-label-b">— BEAM</span>
+      <span class="lbl sel">DIR</span>
+      <input type="range" class="sl-p" id="sl-sb-dir" min="0" max="359" step="1" value="45">
+      <span class="val vp" id="v-sb-dir">45°</span>
+      <div class="sep"></div>
+      <span class="lbl sel">WIDTH</span>
+      <input type="range" class="sl-p" id="sl-sb-width" min="1" max="10" step="0.1" value="1">
+      <span class="val vp" id="v-sb-width">1×</span>
+      <div class="sep"></div>
+      <span class="adv-lbl">RGB</span>
+      <div class="rgb-row"><span class="rgb-lbl rl">R</span><input type="range" class="sr sl-sm" id="sl-sb-r" min="0" max="1" step="0.01" value="0"><span class="rv rl" id="v-sb-r">0%</span></div>
+      <div class="rgb-row"><span class="rgb-lbl gl">G</span><input type="range" class="sg sl-sm" id="sl-sb-g" min="0" max="1" step="0.01" value="1"><span class="rv gl" id="v-sb-g">100%</span></div>
+      <div class="rgb-row"><span class="rgb-lbl bl">B</span><input type="range" class="sb sl-sm" id="sl-sb-b" min="0" max="1" step="0.01" value="0"><span class="rv bl" id="v-sb-b">0%</span></div>
+    </div>
+
+    <!-- delete btn — only visible when selected -->
+    <button class="del-btn" id="delBtn" style="display:none;">✕</button>
+
+    <button class="btn icon-btn" id="displayBtn" title="display" style="margin-left:auto;">&#9633;</button>
+    <span id="countEl" style="display:none;">0 objects</span>
+  </div>
+
+  <canvas id="canvas"></canvas>
+</div>
+
+<script src="shared.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
