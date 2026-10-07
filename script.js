@@ -41,6 +41,12 @@ const objects = [];
 let mouseX = -9999, mouseY = -9999, mouseOnCanvas = false;
 let selectedIdx = -1, isDragging = false, dragOffX = 0, dragOffY = 0;
 
+// stable ids (M1, B2…) so hit events keep referring to the same object even
+// when deleting another one shifts array indices
+const idCounters = { spinner: 0, beam: 0 };
+function withId(o) { o.id = (o.type === 'spinner' ? 'M' : 'B') + (++idCounters[o.type]); return o; }
+function resetIds() { idCounters.spinner = 0; idCounters.beam = 0; }
+
 function resize() { canvas.width = canvas.clientWidth; canvas.height = canvas.clientHeight; }
 resize(); window.addEventListener('resize', resize);
 
@@ -111,7 +117,7 @@ function selectObject(idx) {
   const o = objects[idx];
   if (o.type === 'spinner') {
     showContext('sel-spinner');
-    document.getElementById('sel-label').textContent = `⊙ MIRROR #${idx+1}`;
+    document.getElementById('sel-label').textContent = `⊙ MIRROR ${o.id}`;
     slSsSpeed.value = o.speed;   vSsSpeed.textContent = speedLabel(o.speed);
     const dirDeg = angleToDeg(o.angle);
     slSsDir.value = dirDeg;      vSsDir.textContent   = dirDeg + '°';
@@ -123,7 +129,7 @@ function selectObject(idx) {
     slSsLB.value = o.leakB; vSsLB.textContent = Math.round(o.leakB*100)+'%';
   } else {
     showContext('sel-beam');
-    document.getElementById('sel-label-b').textContent = `— BEAM #${idx+1}`;
+    document.getElementById('sel-label-b').textContent = `— BEAM ${o.id}`;
     slSbDir.value = o.dir; vSbDir.textContent = o.dir + '°';
     const w = o.width || 1;
     slSbWidth.value = w; vSbWidth.textContent = w.toFixed(1) + '×';
@@ -197,16 +203,16 @@ function randomFreePos(minDist) {
 }
 function spawnMirror() {
   const pos = randomFreePos(SPAWN_MIN_DIST);
-  objects.push({ type: 'spinner', x: pos.x, y: pos.y, speed: 2.0, angle: 0,
-    length: 150, hue: Math.random() * 360, leakR: 0, leakG: 0, leakB: 0 });
+  objects.push(withId({ type: 'spinner', x: pos.x, y: pos.y, speed: 2.0, angle: 0,
+    length: 150, hue: Math.random() * 360, leakR: 0, leakG: 0, leakB: 0 }));
   selectObject(objects.length - 1);
   updateCount();
   broadcastState();
 }
 function spawnBeam() {
   const pos = randomFreePos(SPAWN_MIN_DIST);
-  objects.push({ type: 'beam', x: pos.x, y: pos.y, dir: 45,
-    phase: Math.random() * Math.PI * 2, r: 0, g: 1, b: 0, width: 1 });
+  objects.push(withId({ type: 'beam', x: pos.x, y: pos.y, dir: 45,
+    phase: Math.random() * Math.PI * 2, r: 0, g: 1, b: 0, width: 1 }));
   selectObject(objects.length - 1);
   updateCount();
   broadcastState();
@@ -219,7 +225,7 @@ addBeamBtn.addEventListener('click', spawnBeam);
 function randomInt(min, max) { return min + Math.floor(Math.random() * (max - min + 1)); }
 
 function randomComposition() {
-  objects.length = 0;
+  objects.length = 0; resetIds();
   const cx = canvas.width / 2, cy = canvas.height / 2;
   const spread = Math.min(canvas.width, canvas.height) * 0.35;
   const randomPos = () => ({ x: cx + (Math.random() * 2 - 1) * spread, y: cy + (Math.random() * 2 - 1) * spread });
@@ -229,15 +235,15 @@ function randomComposition() {
     const pos = randomPos();
     const speed = (Math.random() * 2 - 1) * 10;
     const dirDeg = randomInt(0, 359);
-    objects.push({ type: 'spinner', x: pos.x, y: pos.y, speed, angle: dirDeg * Math.PI / 180,
-      length: 150, hue: Math.random() * 360, leakR: 0, leakG: 0, leakB: 0 });
+    objects.push(withId({ type: 'spinner', x: pos.x, y: pos.y, speed, angle: dirDeg * Math.PI / 180,
+      length: 150, hue: Math.random() * 360, leakR: 0, leakG: 0, leakB: 0 }));
   }
 
   const beamCount = randomInt(1, 3);
   for (let i = 0; i < beamCount; i++) {
     const pos = randomPos();
-    objects.push({ type: 'beam', x: pos.x, y: pos.y, dir: randomInt(0, 359),
-      phase: Math.random() * Math.PI * 2, r: 0, g: 1, b: 0, width: 1 });
+    objects.push(withId({ type: 'beam', x: pos.x, y: pos.y, dir: randomInt(0, 359),
+      phase: Math.random() * Math.PI * 2, r: 0, g: 1, b: 0, width: 1 }));
   }
 
   selectObject(-1);
@@ -298,7 +304,7 @@ document.addEventListener('mouseup', () => {
 });
 
 // ── save/clear ─────────────────────────────────────────────────────────────
-clearBtn.addEventListener('click', () => { objects.length = 0; selectObject(-1); updateCount(); broadcastState(); });
+clearBtn.addEventListener('click', () => { objects.length = 0; resetIds(); selectObject(-1); updateCount(); broadcastState(); });
 // ── capture video ──────────────────────────────────────────────────────────
 // Renders offline at a fixed 1/30s timestep per frame, independent of real
 // wall-clock/render performance, so the output is always full quality —
@@ -424,7 +430,9 @@ canvas.addEventListener('touchcancel', () => { touchDragId = -1; }, { passive: f
 let last = performance.now();
 function draw(now) {
   const dt = Math.min((now-last)/1000,0.05); last=now; const t=now/1000;
-  stepAndDrawCore(ctx, objects, dt, t, selectedIdx, mirrorBrightness);
+  const hits = [];
+  stepAndDrawCore(ctx, objects, dt, t, selectedIdx, mirrorBrightness, hits);
+  BeamHits.update(hits, t);
 
   // keep the DIR readout tracking a spinning mirror's live angle while it's
   // selected, unless the user is mid-drag on the slider themselves

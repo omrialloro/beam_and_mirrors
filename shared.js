@@ -9,12 +9,16 @@ function segIntersect(px, py, dx, dy, ax, ay, bx, by) {
   const ex=bx-ax,ey=by-ay,denom=dx*ey-dy*ex;
   if (Math.abs(denom)<1e-10) return null;
   const tx=ax-px,ty=ay-py,t=(tx*ey-ty*ex)/denom,u=(tx*dy-ty*dx)/denom;
-  if (t>1e-4&&u>=0&&u<=1) return {t,ix:px+dx*t,iy:py+dy*t};
+  if (t>1e-4&&u>=0&&u<=1) return {t,u,ix:px+dx*t,iy:py+dy*t};
   return null;
 }
 function reflect(dx,dy,nx,ny){const l=Math.sqrt(nx*nx+ny*ny),nnx=nx/l,nny=ny/l,d=dx*nnx+dy*nny;return{dx:dx-2*d*nnx,dy:dy-2*d*nny};}
 function edgeEnd(ox,oy,dx,dy,W,H){let t=Infinity;if(dx>0)t=Math.min(t,(W-ox)/dx);if(dx<0)t=Math.min(t,(0-ox)/dx);if(dy>0)t=Math.min(t,(H-oy)/dy);if(dy<0)t=Math.min(t,(0-oy)/dy);return t;}
-function traceRay(ox,oy,dirDeg,spinners,excl,er,eg,eb,depth,segs,W,H){
+// rec (optional): {beamId, hits} — when given, every mirror contact along the
+// ray tree is pushed to rec.hits (see hits.js). path is the list of contacts
+// that led here ('M3r' = reflected off M3, 'M3t' = leaked through M3), which
+// makes repeat hits of the same mirror by the same beam distinguishable.
+function traceRay(ox,oy,dirDeg,spinners,excl,er,eg,eb,depth,segs,W,H,rec,path){
   if(depth>24||(er<MIN_ENERGY&&eg<MIN_ENERGY&&eb<MIN_ENERGY))return;
   const rad=(dirDeg-90)*Math.PI/180,dx=Math.cos(rad),dy=Math.sin(rad);
   let nearest=null,ni=-1;
@@ -29,8 +33,29 @@ function traceRay(ox,oy,dirDeg,spinners,excl,er,eg,eb,depth,segs,W,H){
   segs.push({x1:ox,y1:oy,x2:nearest.ix,y2:nearest.iy,er,eg,eb,last:false});
   const s=spinners[ni],lR=s.leakR,lG=s.leakG,lB=s.leakB,cos=Math.cos(s.angle),sin=Math.sin(s.angle);
   const ref=reflect(dx,dy,-sin,cos);
-  traceRay(nearest.ix,nearest.iy,(Math.atan2(ref.dy,ref.dx)*180/Math.PI+90+360)%360,spinners,ni,er*(1-lR),eg*(1-lG),eb*(1-lB),depth+1,segs,W,H);
-  if(lR>0||lG>0||lB>0)traceRay(nearest.ix,nearest.iy,(Math.atan2(dy,dx)*180/Math.PI+90+360)%360,spinners,ni,er*lR,eg*lG,eb*lB,depth+1,segs,W,H);
+  let pathR,pathT;
+  if(rec){
+    path=path||[];
+    const dot=dx*-sin+dy*cos;
+    rec.hits.push({
+      key:rec.beamId+'|'+path.concat(s.id).join('>'),
+      beamId:rec.beamId, mirrorId:s.id, hue:s.hue,
+      depth,                                                    // 0 = first contact after leaving the beam source
+      visit:path.filter(p=>p.slice(0,-1)===s.id).length+1,      // nth time this beam's path hits this mirror
+      path:path.slice(),
+      x:nearest.ix, y:nearest.iy,
+      u:nearest.u,                                              // 0..1 along the mirror line
+      offset:(nearest.u-0.5)*s.length,                          // px from mirror center
+      incidence:Math.acos(Math.min(1,Math.abs(dot)))*180/Math.PI, // 0° head-on … 90° grazing
+      side:dot<0?1:-1,                                          // which face of the mirror was hit
+      heading:dirDeg,                                           // incoming ray direction (0° = up)
+      mirrorAngle:((s.angle*180/Math.PI)%360+360)%360,
+      r:er, g:eg, b:eb, energy:Math.max(er,eg,eb)
+    });
+    pathR=path.concat(s.id+'r'); pathT=path.concat(s.id+'t');
+  }
+  traceRay(nearest.ix,nearest.iy,(Math.atan2(ref.dy,ref.dx)*180/Math.PI+90+360)%360,spinners,ni,er*(1-lR),eg*(1-lG),eb*(1-lB),depth+1,segs,W,H,rec,pathR);
+  if(lR>0||lG>0||lB>0)traceRay(nearest.ix,nearest.iy,(Math.atan2(dy,dx)*180/Math.PI+90+360)%360,spinners,ni,er*lR,eg*lG,eb*lB,depth+1,segs,W,H,rec,pathT);
 }
 
 // All draw* helpers take an explicit dctx (rather than closing over a single
@@ -79,8 +104,9 @@ function drawBeamDot(dctx,o,sel){
 // Advances mirror/beam physics by dt and draws the composition onto dctx.
 // Shared by: the main window's live rAF loop, the popup display window's
 // rAF loop, and the offline video-capture loop — so output is identical
-// regardless of which canvas/window produced the frame.
-function stepAndDrawCore(dctx, objs, dt, t, selIdx, brightness) {
+// regardless of which canvas/window produced the frame. Pass a hits array to
+// collect this frame's mirror contacts (only the main window does).
+function stepAndDrawCore(dctx, objs, dt, t, selIdx, brightness, hits) {
   const W = dctx.canvas.width, H = dctx.canvas.height;
   dctx.clearRect(0,0,W,H);
   const spinners = objs.filter(o=>o.type==='spinner');
@@ -95,7 +121,7 @@ function stepAndDrawCore(dctx, objs, dt, t, selIdx, brightness) {
     const fl=0.92+0.05*Math.sin(t*18+o.phase)+0.03*(Math.random()-0.5);
     const al=Math.max(0.8,Math.min(1.0,fl));
     drawBeamDot(dctx,o,i===selIdx);
-    const segs=[];traceRay(o.x,o.y,o.dir,spinners,-1,o.r,o.g,o.b,0,segs,W,H);
+    const segs=[];traceRay(o.x,o.y,o.dir,spinners,-1,o.r,o.g,o.b,0,segs,W,H,hits?{beamId:o.id,hits}:null,[]);
     drawSegs(dctx,segs,al,false, o.width || 1);
   }
 }

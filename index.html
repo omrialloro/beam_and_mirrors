@@ -14,6 +14,7 @@
     <div style="margin-left:auto;display:flex;gap:8px;padding-right:12px;">
       <button class="btn" id="exportBtn" style="display:none;">&#8681; json</button>
       <button class="btn capture" id="captureBtn" style="display:none;">&#9679; capture</button>
+      <button class="btn icon-btn" id="displayBtn" title="open display window">&#9633;</button>
     </div>
   </div>
 
@@ -83,14 +84,31 @@
     <!-- delete btn — only visible when selected -->
     <button class="del-btn" id="delBtn" style="display:none;">✕</button>
 
-    <button class="btn icon-btn" id="displayBtn" title="display" style="margin-left:auto;">&#9633;</button>
     <span id="countEl" style="display:none;">0 objects</span>
   </div>
 
-  <canvas id="canvas"></canvas>
+  <div id="stage">
+    <canvas id="canvas"></canvas>
+
+    <!-- live mirror-hit readout (sidebar.js) -->
+    <aside id="hitsSidebar">
+      <div class="hits-head">
+        <span class="hits-title">HITS</span>
+        <button class="hits-toggle" id="hitsToggle">‹</button>
+      </div>
+      <div class="hits-body">
+        <div id="hitsSummary" class="hits-summary"></div>
+        <div id="hitsList" class="hits-list"></div>
+        <div class="hits-sub">EVENTS</div>
+        <div id="hitsLog" class="hits-log"></div>
+      </div>
+    </aside>
+  </div>
 </div>
 
 <script src="shared.js"></script>
+<script src="hits.js"></script>
 <script src="script.js"></script>
+<script src="sidebar.js"></script>
 </body>
 </html>
